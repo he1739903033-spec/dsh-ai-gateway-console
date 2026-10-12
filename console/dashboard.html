@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 网关控制台</title>
+<style>
+/* ============================================================
+   设计令牌
+   ============================================================ */
+:root[data-theme="dark"]{
+  --bg:#08090b;
+  --glow-a:rgba(52,211,153,.075);
+  --glow-b:rgba(96,165,250,.065);
+  --surface:rgba(255,255,255,.026);
+  --surface-2:rgba(255,255,255,.045);
+  --surface-3:rgba(255,255,255,.065);
+  --surface-solid:#111216;
+  --border:rgba(255,255,255,.072);
+  --border-strong:rgba(255,255,255,.135);
+  --fg:#f0f1f3;
+  --fg-dim:#a2a7b0;
+  --fg-faint:#6b7280;
+  --ok:#34d399;      --ok-bg:rgba(52,211,153,.12);
+  --warn:#fbbf24;    --warn-bg:rgba(251,191,36,.12);
+  --bad:#f87171;     --bad-bg:rgba(248,113,113,.12);
+  --info:#60a5fa;    --info-bg:rgba(96,165,250,.12);
+  --violet:#a78bfa;  --violet-bg:rgba(167,139,250,.12);
+  --accent:#34d399;
+  --accent-ink:#04231a;
+  --accent-grad:linear-gradient(135deg,#34d399,#22d3ee);
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 12px 32px -16px rgba(0,0,0,.7);
+  --shadow-hover:0 2px 4px rgba(0,0,0,.4),0 18px 44px -18px rgba(0,0,0,.8);
+  --inset:inset 0 1px 0 rgba(255,255,255,.05);
+  --track:rgba(255,255,255,.07);
+}
+:root[data-theme="light"]{
+  --bg:#f5f6f8;
+  --glow-a:rgba(13,148,136,.07);
+  --glow-b:rgba(59,130,246,.06);
+  --surface:#ffffff;
+  --surface-2:#f7f8fa;
+  --surface-3:#eef0f4;
+  --surface-solid:#ffffff;
+  --border:rgba(15,23,42,.08);
+  --border-strong:rgba(15,23,42,.16);
+  --fg:#0d1117;
+  --fg-dim:#5b6472;
+  --fg-faint:#8b93a1;
+  --ok:#059669;      --ok-bg:rgba(5,150,105,.1);
+  --warn:#b45309;    --warn-bg:rgba(180,83,9,.1);
+  --bad:#dc2626;     --bad-bg:rgba(220,38,38,.1);
+  --info:#2563eb;    --info-bg:rgba(37,99,235,.1);
+  --violet:#7c3aed;  --violet-bg:rgba(124,58,237,.1);
+  --accent:#0d9488;
+  --accent-ink:#ffffff;
+  --accent-grad:linear-gradient(135deg,#0d9488,#0891b2);
+  --shadow:0 1px 2px rgba(15,23,42,.05),0 10px 28px -18px rgba(15,23,42,.28);
+  --shadow-hover:0 2px 6px rgba(15,23,42,.07),0 18px 40px -20px rgba(15,23,42,.32);
+  --inset:inset 0 1px 0 rgba(255,255,255,.9);
+  --track:rgba(15,23,42,.07);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--fg); position:relative; overflow-x:hidden;
+  font:14px/1.6 "Segoe UI Variable Text",-apple-system,BlinkMacSystemFont,"Segoe UI",
+       "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+body::before{
+  content:""; position:fixed; inset:-20% -10% auto -10%; height:70vh; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(46% 58% at 18% 12%, var(--glow-a), transparent 62%),
+    radial-gradient(42% 54% at 82% 6%, var(--glow-b), transparent 60%);
+  filter:blur(6px);
+}
+.mono{font-family:ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,monospace;font-variant-numeric:tabular-nums}
+
+/* ============================================================
+   骨架
+   ============================================================ */
+.shell{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:24px 20px 52px}
+.topbar{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:13px;min-width:0}
+.brand-mark{
+  width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:0 0 auto;
+  background:var(--accent-grad); color:var(--accent-ink);
+  box-shadow:0 6px 18px -6px rgba(52,211,153,.55), var(--inset);
+}
+.brand-mark svg{width:22px;height:22px}
+.brand h1{font-size:18px;font-weight:640;letter-spacing:-.25px;line-height:1.25}
+.brand .sub{font-size:12.5px;color:var(--fg-dim);margin-top:1px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.live{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;
+  background:var(--surface);border:1px solid var(--border);font-size:12.5px;color:var(--fg-dim);
+  backdrop-filter:blur(12px);white-space:nowrap;
+}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--ok);position:relative;flex:0 0 auto}
+.pulse::after{
+  content:"";position:absolute;inset:-4px;border-radius:50%;
+  border:1.5px solid var(--ok);opacity:.5;animation:ring 2.2s ease-out infinite;
+}
+@keyframes ring{0%{transform:scale(.6);opacity:.6}70%{transform:scale(1.5);opacity:0}100%{opacity:0}}
+.live.dead .pulse{background:var(--bad)}
+.live.dead .pulse::after{border-color:var(--bad)}
+
+.icon-btn{
+  width:38px;height:38px;border-radius:11px;display:grid;place-items:center;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);color:var(--fg-dim);
+  transition:all .16s ease; backdrop-filter:blur(12px);
+}
+.icon-btn:hover{color:var(--fg);border-color:var(--border-strong);background:var(--surface-2)}
+.icon-btn:active{transform:scale(.94)}
+.icon-btn svg{width:17px;height:17px}
+:root[data-theme="dark"] .ico-sun{display:block}
+:root[data-theme="dark"] .ico-moon{display:none}
+:root[data-theme="light"] .ico-sun{display:none}
+:root[data-theme="light"] .ico-moon{display:block}
+
+/* ============================================================
+   状态带
+   ============================================================ */
+.statbar{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:16px;
+}
+.stat{
+  background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:11px 14px;
+  backdrop-filter:blur(12px);box-shadow:var(--shadow),var(--inset);min-width:0;
+  transition:border-color .18s ease;
+}
+.stat:hover{border-color:var(--border-strong)}
+.stat .k{font-size:10.5px;color:var(--fg-faint);letter-spacing:.55px;text-transform:uppercase;font-weight:650}
+.stat .v{font-size:19px;font-weight:660;margin-top:3px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .v small{font-size:12px;font-weight:520;color:var(--fg-faint);margin-left:3px}
+.stat .v.ok{color:var(--ok)} .stat .v.warn{color:var(--warn)}
+.stat .v.bad{color:var(--bad)} .stat .v.dim{color:var(--fg-faint)}
+
+/* ============================================================
+   标签页
+   ============================================================ */
+.tabs{
+  display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid var(--border);
+  overflow-x:auto;scrollbar-width:none;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  position:relative;padding:10px 16px;font-size:13.5px;font-weight:580;color:var(--fg-dim);
+  background:none;border:0;cursor:pointer;white-space:nowrap;transition:color .16s ease;
+  display:inline-flex;align-items:center;gap:7px;border-radius:9px 9px 0 0;
+}
+.tab:hover{color:var(--fg);background:var(--surface)}
+.tab.on{color:var(--fg);font-weight:640}
+.tab.on::after{
+  content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;border-radius:2px;
+  background:var(--accent-grad);box-shadow:0 0 10px -1px var(--accent);
+}
+.tab .dot{width:6px;height:6px;border-radius:50%;background:var(--fg-faint);flex:0 0 auto}
+.tab .dot.ok{background:var(--ok)} .tab .dot.bad{background:var(--bad)}
+.panel{display:none}
+.panel.on{display:block;animation:fade .22s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ============================================================
+   卡片
+   ============================================================ */
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  box-shadow:var(--shadow), var(--inset); backdrop-filter:blur(14px);
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.card:hover{border-color:var(--border-strong);box-shadow:var(--shadow-hover),var(--inset)}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-bottom:14px}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px}
+.sec-head{display:flex;align-items:center;gap:10px;margin:20px 2px 10px}
+.sec-head h2{font-size:11.5px;font-weight:680;color:var(--fg-faint);letter-spacing:.9px;text-transform:uppercase}
+.sec-head .rule{flex:1;height:1px;background:var(--border)}
+.sec-head .hint{font-size:11.5px;color:var(--fg-faint);font-weight:400;letter-spacing:0;text-transform:none}
+
+/* 服务卡 */
+.svc{padding:18px 18px 16px}
+.svc-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.svc-ico{
+  width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto;
+  background:var(--surface-2);border:1px solid var(--border);color:var(--fg-dim);
+}
+.svc-ico svg{width:18px;height:18px}
+.svc-title{font-size:15px;font-weight:640;letter-spacing:-.15px}
+.svc-port{font-size:11.5px;color:var(--fg-faint);margin-top:2px}
+.badge{
+  margin-left:auto;display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;
+  font-size:11.5px;font-weight:620;white-space:nowrap;border:1px solid transparent;transition:all .2s;
+}
+.badge .led{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+.badge.up{background:var(--ok-bg);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 26%,transparent)}
+.badge.up .led{background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg)}
+.badge.down{background:var(--bad-bg);color:var(--bad);border-color:color-mix(in srgb,var(--bad) 26%,transparent)}
+.badge.down .led{background:var(--bad);box-shadow:0 0 0 3px var(--bad-bg)}
+.badge.idle{background:var(--surface-2);color:var(--fg-faint);border-color:var(--border)}
+.badge.idle .led{background:var(--fg-faint)}
+
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.metric{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:9px 11px;min-width:0}
+.metric .k{font-size:10px;color:var(--fg-faint);letter-spacing:.35px;text-transform:uppercase;font-weight:650}
+.metric .v{font-size:14.5px;font-weight:650;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.metric .v.ok{color:var(--ok)} .metric .v.off{color:var(--fg-faint)} .metric .v.warn{color:var(--warn)}
+
+.btns{display:flex;flex-wrap:wrap;gap:7px}
+button{
+  font:inherit;font-size:12.5px;font-weight:580;cursor:pointer;white-space:nowrap;
+  border:1px solid var(--border);background:var(--surface-2);color:var(--fg);
+  border-radius:9px;padding:7px 13px;transition:all .15s ease;
+  display:inline-flex;align-items:center;gap:6px;
+}
+button svg{width:13px;height:13px;flex:0 0 auto}
+button:hover{border-color:var(--border-strong);background:var(--surface-3)}
+button:active{transform:translateY(1px) scale(.99)}
+button.primary{
+  background:var(--accent-grad);border-color:transparent;color:var(--accent-ink);font-weight:640;
+  box-shadow:0 6px 16px -8px rgba(52,211,153,.7), var(--inset);
+}
+button.primary:hover{filter:brightness(1.06)}
+button.ghost{background:transparent;border-color:transparent;color:var(--fg-dim)}
+button.ghost:hover{background:var(--surface-2);color:var(--fg)}
+button.danger{border-color:color-mix(in srgb,var(--bad) 34%,transparent);color:var(--bad);background:var(--bad-bg)}
+button.tiny{padding:4px 9px;font-size:11.5px;border-radius:7px}
+button:disabled{opacity:.55;cursor:default;transform:none}
+button.busy{pointer-events:none;opacity:.7}
+
+/* 控制器芯片 */
+.ctrl{padding:13px 15px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ctrl .ico{
+  width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;
+  background:var(--surface-2);border:1px solid var(--border);
+}
+.ctrl .ico svg{width:15px;height:15px}
+.ctrl .body{min-width:0;flex:1}
+.ctrl .t{font-size:13.5px;font-weight:620}
+.ctrl .d{font-size:11.5px;color:var(--fg-faint);margin-top:1px;line-height:1.45}
+
+/* ============================================================
+   表格
+   ============================================================ */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{
+  text-align:left;font-size:10.5px;font-weight:680;color:var(--fg-faint);
+  letter-spacing:.5px;text-transform:uppercase;padding:9px 12px;
+  border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface-2);
+}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr{transition:background .13s}
+tbody tr:hover{background:var(--surface-2)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.strong{font-weight:620}
+td.mute{color:var(--fg-faint)}
+
+.chip{
+  display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:650;
+  padding:2.5px 8px;border-radius:7px;white-space:nowrap;border:1px solid transparent;
+}
+.chip.ok{background:var(--ok-bg);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 20%,transparent)}
+.chip.warn{background:var(--warn-bg);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 20%,transparent)}
+.chip.bad{background:var(--bad-bg);color:var(--bad);border-color:color-mix(in srgb,var(--bad) 20%,transparent)}
+.chip.off{background:var(--surface-2);color:var(--fg-faint);border-color:var(--border)}
+.chip.info{background:var(--info-bg);color:var(--info);border-color:color-mix(in srgb,var(--info) 20%,transparent)}
+.chip.violet{background:var(--violet-bg);color:var(--violet);border-color:color-mix(in srgb,var(--violet) 20%,transparent)}
+.chips{display:inline-flex;gap:5px;flex-wrap:wrap}
+
+/* 额度条 */
+.qbar{display:flex;align-items:center;gap:8px;min-width:120px}
+.qbar .track{flex:1;height:5px;border-radius:3px;background:var(--track);overflow:hidden;min-width:44px}
+.qbar .fill{height:100%;border-radius:3px;background:var(--accent-grad);transition:width .5s cubic-bezier(.4,0,.2,1)}
+.qbar .fill.low{background:linear-gradient(135deg,#fbbf24,#f87171)}
+.qbar .txt{font-size:11px;color:var(--fg-dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ============================================================
+   配置编辑
+   ============================================================ */
+.cfg{padding:16px 18px}
+.cfg-row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}
+.cfg-row:last-child{margin-bottom:0}
+.cfg-label{font-size:12px;font-weight:620;color:var(--fg-dim);width:96px;flex:0 0 auto;padding-top:6px}
+.tags{
+  flex:1;min-width:220px;display:flex;flex-wrap:wrap;gap:6px;padding:7px 9px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:10px;min-height:38px;
+}
+.tag{
+  display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:7px;font-size:11.5px;
+  background:var(--surface-3);border:1px solid var(--border);font-weight:560;
+}
+.tag button{
+  border:0;background:none;padding:0;width:14px;height:14px;display:grid;place-items:center;
+  color:var(--fg-faint);cursor:pointer;border-radius:4px;font-size:13px;line-height:1;
+}
+.tag button:hover{color:var(--bad);background:var(--bad-bg)}
+input[type=text],select{
+  font:inherit;font-size:12.5px;padding:7px 10px;border-radius:9px;
+  background:var(--surface-2);border:1px solid var(--border);color:var(--fg);min-width:0;
+}
+input[type=text]:focus,select:focus{outline:none;border-color:var(--accent);background:var(--surface-3)}
+.cfg-note{font-size:11.5px;color:var(--fg-faint);line-height:1.6}
+.cfg-note code{background:var(--surface-3);padding:1px 5px;border-radius:4px;font-size:11px}
+
+/* ============================================================
+   日志
+   ============================================================ */
+.logs-top{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.logs-top .path{font-size:11.5px;color:var(--fg-faint);margin-left:auto}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:2px;gap:2px}
+.seg button{border:0;background:none;padding:5px 11px;font-size:12px;border-radius:7px;color:var(--fg-dim)}
+.seg button.on{background:var(--surface-solid);color:var(--fg);box-shadow:var(--shadow)}
+.logbox{
+  height:520px;overflow:auto;padding:12px 16px;font:12px/1.65 ui-monospace,"Cascadia Code",Consolas,monospace;
+  white-space:pre-wrap;word-break:break-all;background:var(--surface-2);
+}
+.logbox .ln{padding:1px 0}
+.logbox .ln.ok{color:var(--ok)}
+.logbox .ln.bad{color:var(--bad)}
+.logbox .ln.warn{color:var(--warn)}
+.logbox .ln.dim{color:var(--fg-faint)}
+
+/* ============================================================
+   倍率表
+   ============================================================ */
+.rates-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.rates-top .meta{font-size:12.5px;color:var(--fg-dim)}
+.rates-top .meta b{color:var(--fg);font-weight:620}
+.rates-top button{margin-left:auto}
+.rate-row{
+  display:grid;grid-template-columns:minmax(150px,1.5fr) 84px minmax(70px,2fr) 64px 108px;
+  align-items:center;gap:14px;padding:11px 18px;border-bottom:1px solid var(--border);
+  font-size:12.5px;transition:background .15s;
+}
+.rate-row:last-child{border-bottom:0}
+.rate-row:hover{background:var(--surface-2)}
+.rate-model{font-weight:620;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rate-credits{text-align:right;color:var(--fg-dim);font-size:12px}
+.bar{height:7px;background:var(--surface-2);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+.bar>i{display:block;height:100%;border-radius:3px;background:var(--accent-grad);
+       transition:width .55s cubic-bezier(.4,0,.2,1);box-shadow:0 0 10px -2px var(--accent)}
+.rate-badge{
+  text-align:center;font-weight:700;font-size:11.5px;padding:3px 0;border-radius:7px;
+  background:var(--ok-bg);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 22%,transparent);
+}
+.rate-badge.peak{background:var(--warn-bg);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 26%,transparent)}
+.rate-val{text-align:right;color:var(--fg-faint);font-size:11px}
+
+.empty{padding:26px 18px;color:var(--fg-dim);font-size:12.5px;text-align:center}
+.empty .hint{display:block;color:var(--fg-faint);font-size:11.5px;margin-top:5px}
+
+/* ============================================================
+   底部 / Toast
+   ============================================================ */
+footer{margin-top:26px;text-align:center;color:var(--fg-faint);font-size:11.5px;line-height:1.9}
+footer .kbd{display:inline-block;padding:1px 6px;border-radius:5px;background:var(--surface-2);
+            border:1px solid var(--border);font-size:11px}
+#toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(18px) scale(.97);
+  background:var(--surface-solid);color:var(--fg);font-size:13px;font-weight:520;
+  padding:11px 20px;border-radius:12px;border:1px solid var(--border-strong);
+  box-shadow:0 12px 40px -12px rgba(0,0,0,.7);opacity:0;pointer-events:none;
+  transition:all .24s cubic-bezier(.4,0,.2,1);max-width:min(90vw,560px);text-align:center;
+  z-index:99;backdrop-filter:blur(16px);
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+#toast.err{border-color:color-mix(in srgb,var(--bad) 45%,transparent);color:var(--bad)}
+
+@media (max-width:760px){
+  .shell{padding:18px 13px 40px}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .rate-row{grid-template-columns:1fr 70px 60px;row-gap:6px}
+  .rate-row .bar{grid-column:1/-1;order:3}
+  .rate-val{display:none}
+  .cfg-label{width:100%;padding-top:0}
+  .logbox{height:400px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ==================== 顶栏 ==================== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/>
+          <rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>
+        </svg>
+      </div>
+      <div>
+        <h1>AI 网关控制台</h1>
+        <div class="sub">Trae · WorkBuddy · Hub · 后台控制器</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="live" id="live"><span class="pulse"></span><span id="clock">连接中…</span></div>
+      <button class="icon-btn" id="theme-btn" title="切换主题" aria-label="切换主题">
+        <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+        </svg>
+        <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ==================== 状态带 ==================== -->
+  <div class="statbar" id="statbar"></div>
+
+  <!-- ==================== 标签页 ==================== -->
+  <nav class="tabs" id="tabs">
+    <button class="tab on" data-tab="overview">总览</button>
+    <button class="tab" data-tab="trae"><span class="dot" id="dot-trae"></span>Trae</button>
+    <button class="tab" data-tab="wb"><span class="dot" id="dot-wb"></span>WorkBuddy</button>
+    <button class="tab" data-tab="rates">模型倍率</button>
+    <button class="tab" data-tab="logs">运行日志</button>
+  </nav>
+
+  <main>
+    <!-- ==================== 总览 ==================== -->
+    <section class="panel on" id="panel-overview">
+      <div class="grid-2">
+        <article class="card svc" id="card-trae">
+          <div class="svc-head">
+            <div class="svc-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>
+              </svg>
+            </div>
+            <div>
+              <div class="svc-title">Trae 网关</div>
+              <div class="svc-port mono">127.0.0.1:8327 · Trae2api-cn</div>
+            </div>
+            <span class="badge down" id="trae-badge"><span class="led"></span><span id="trae-badge-txt">检测中</span></span>
+          </div>
+          <div class="metrics">
+            <div class="metric"><div class="k">账号</div><div class="v" id="trae-accounts">—</div></div>
+            <div class="metric"><div class="k">轮询</div><div class="v" id="trae-polling">—</div></div>
+            <div class="metric"><div class="k">令牌</div><div class="v" id="trae-token">—</div></div>
+          </div>
+          <div class="btns">
+            <button class="primary" data-act="add-account">+ 添加账号</button>
+            <button data-act="open-trae-console">打开控制台</button>
+            <button data-act="start-trae">启动 / 重启</button>
+            <button class="ghost" data-goto="trae">账号与用量 →</button>
+          </div>
+        </article>
+
+        <article class="card svc" id="card-wb">
+          <div class="svc-head">
+            <div class="svc-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2.5" y="4" width="19" height="7" rx="2.5"/><rect x="2.5" y="13" width="19" height="7" rx="2.5"/>
+                <path d="M6.5 7.5h.01M6.5 16.5h.01"/>
+              </svg>
+            </div>
+            <div>
+              <div class="svc-title">WorkBuddy 网关</div>
+              <div class="svc-port mono">127.0.0.1:8317 · workbuddy-gateway.exe</div>
+            </div>
+            <span class="badge down" id="wb-badge"><span class="led"></span><span id="wb-badge-txt">检测中</span></span>
+          </div>
+          <div class="metrics">
+            <div class="metric"><div class="k">模型</div><div class="v" id="wb-models">—</div></div>
+            <div class="metric"><div class="k">账号</div><div class="v" id="wb-creds">—</div></div>
+            <div class="metric"><div class="k">版本</div><div class="v" id="wb-version">—</div></div>
+          </div>
+          <div class="btns">
+            <button class="primary" data-goto="wb">+ 添加账号</button>
+            <button data-act="open-hub">打开 Hub 看板</button>
+            <button data-act="restart-wb">重启网关</button>
+            <button class="ghost" data-goto="wb">账号与模型 →</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="sec-head"><h2>后台控制器</h2><div class="rule"></div>
+        <span class="hint">无端口进程，靠单实例互斥体探测存活</span></div>
+      <div class="grid-3" id="ctrl-grid"></div>
+
+      <div class="sec-head"><h2>快捷操作</h2><div class="rule"></div></div>
+      <div class="btns">
+        <button data-act="start-all">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+          启动全部网关
+        </button>
+        <button data-act="open-trae-logs">Trae 日志目录</button>
+        <button data-act="open-wb-logs">WorkBuddy 日志目录</button>
+        <button class="ghost" data-act="open-docs">Trae 项目目录</button>
+        <button class="ghost" data-act="open-wb-docs">WorkBuddy 项目目录</button>
+      </div>
+    </section>
+
+    <!-- ==================== Trae ==================== -->
+    <section class="panel" id="panel-trae">
+      <div class="sec-head"><h2>账号池</h2><div class="rule"></div>
+        <span class="hint" id="trae-poll-hint"></span>
+        <button class="tiny" data-act="add-account">+ 添加账号</button></div>
+      <section class="card">
+        <div class="tbl-wrap"><table id="trae-acct-table">
+          <thead><tr>
+            <th>账号</th><th>站点</th><th>状态</th><th>额度</th><th>Token 到期</th><th>操作</th>
+          </tr></thead>
+          <tbody><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+        </table></div>
+      </section>
+
+      <div class="sec-head"><h2>今日用量</h2><div class="rule"></div></div>
+      <div class="grid-3" id="trae-usage"></div>
+
+      <div class="sec-head"><h2>模型</h2><div class="rule"></div>
+        <span class="hint">近 7 日累计</span></div>
+      <section class="card">
+        <div class="tbl-wrap"><table id="trae-model-table">
+          <thead><tr><th>模型</th><th class="num">请求</th><th class="num">输入 tokens</th><th class="num">输出 tokens</th><th class="num">合计</th></tr></thead>
+          <tbody><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+        </table></div>
+      </section>
+
+      <div class="sec-head"><h2>签到</h2><div class="rule"></div></div>
+      <section class="card">
+        <div class="tbl-wrap"><table id="trae-checkin-table">
+          <thead><tr><th>账号</th><th>今日签到</th><th class="num">签到积分</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+        </table></div>
+      </section>
+    </section>
+
+    <!-- ==================== WorkBuddy ==================== -->
+    <section class="panel" id="panel-wb">
+      <div class="sec-head"><h2>账号池</h2><div class="rule"></div>
+        <span class="hint" id="wb-updated"></span>
+        <button class="tiny" data-act="wb-add-cn">+ 国内站</button>
+        <button class="tiny" data-act="wb-add-intl">+ 国际站</button></div>
+      <section class="card">
+        <div class="tbl-wrap"><table id="wb-acct-table">
+          <thead><tr>
+            <th>账号</th><th>站点</th><th>状态</th><th>额度</th><th>Token 到期</th><th>操作</th>
+          </tr></thead>
+          <tbody><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+        </table></div>
+      </section>
+
+      <div class="sec-head"><h2>今日用量</h2><div class="rule"></div>
+        <span class="hint" id="wb-usage-hint"></span></div>
+      <div class="grid-3" id="wb-usage"></div>
+
+      <div class="sec-head"><h2>模型</h2><div class="rule"></div>
+        <span class="hint">倍率与请求统计来自网关自身快照</span></div>
+      <section class="card">
+        <div class="tbl-wrap"><table id="wb-model-table">
+          <thead><tr>
+            <th>模型</th><th class="num">国内倍率</th><th class="num">国际倍率</th><th class="num">可用凭据</th>
+            <th class="num">请求</th><th class="num">成功</th><th class="num">失败</th><th class="num">Tokens</th><th>最后状态</th>
+          </tr></thead>
+          <tbody><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
+        </table></div>
+      </section>
+
+      <div class="sec-head"><h2>网关配置</h2><div class="rule"></div>
+        <span class="hint">写入 <code>config.json</code>，改完需重启网关</span></div>
+      <section class="card cfg">
+        <div class="cfg-row">
+          <div class="cfg-label">模型白名单</div>
+          <div class="tags" id="cfg-allow"></div>
+          <select id="cfg-allow-add" style="width:auto"></select>
+          <button class="tiny" id="cfg-allow-btn">加入</button>
+        </div>
+        <div class="cfg-row">
+          <div class="cfg-label">站点绑定</div>
+          <div class="tags" id="cfg-bind"></div>
+        </div>
+        <div class="cfg-row">
+          <div class="cfg-label"></div>
+          <div style="flex:1;min-width:220px">
+            <div class="cfg-note" id="cfg-note"></div>
+          </div>
+        </div>
+        <div class="cfg-row">
+          <div class="cfg-label"></div>
+          <div class="btns" style="flex:1">
+            <button class="primary" id="cfg-save">保存配置</button>
+            <button id="cfg-reload">重新读取</button>
+            <button class="danger" data-act="restart-wb">保存后重启网关</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ==================== 倍率 ==================== -->
+    <section class="panel" id="panel-rates">
+      <section class="card rates">
+        <div class="rates-top">
+          <span class="meta" id="rates-updated">尚未实测</span>
+          <button class="primary" id="rates-btn" data-act="measure-rates">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+            重新实测
+          </button>
+        </div>
+        <div id="rates-body">
+          <div class="empty">点「重新实测」开始
+            <span class="hint">对每个 Trae 模型发一次相同请求，约 1–3 分钟，消耗少量积分</span>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ==================== 日志 ==================== -->
+    <section class="panel" id="panel-logs">
+      <section class="card">
+        <div class="logs-top">
+          <div class="seg" id="log-seg">
+            <button class="on" data-src="wb">WorkBuddy 网关</button>
+            <button data-src="trae">Trae 网关</button>
+            <button data-src="watchdog">守护</button>
+            <button data-src="v41flash">站点控制</button>
+            <button data-src="credential">账号同步</button>
+          </div>
+          <label style="font-size:12px;color:var(--fg-dim);display:inline-flex;align-items:center;gap:6px">
+            <input type="checkbox" id="log-follow" checked> 自动刷新
+          </label>
+          <span class="path mono" id="log-path"></span>
+        </div>
+        <div class="logbox" id="logbox"><span class="ln dim">加载中…</span></div>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    每 5 秒刷新状态 · 仅本机与局域网可见<br>
+    快捷键 <span class="kbd">Ctrl</span>+<span class="kbd">R</span> 手动刷新 ·
+    <span class="kbd">Ctrl</span>+<span class="kbd">1</span>…<span class="kbd">5</span> 切换标签
+  </footer>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+  {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------------- 主题 ---------------- */
+const THEME_KEY = 'ai-gateway-console-theme';
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  try{ localStorage.setItem(THEME_KEY, t); }catch(e){}
+}
+(function initTheme(){
+  let saved = null;
+  try{ saved = localStorage.getItem(THEME_KEY); }catch(e){}
+  if(saved === 'dark' || saved === 'light'){ applyTheme(saved); return; }
+  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(dark ? 'dark' : 'light');
+})();
+$('theme-btn').addEventListener('click', () => {
+  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+});
+
+/* ---------------- 工具 ---------------- */
+let toastTimer = null;
+function toast(msg, isErr){
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 2800);
+}
+function fmtExpiry(raw){
+  if(!raw) return '—';
+  let s = String(raw);
+  if(/^\d+$/.test(s)){
+    let n = Number(s);
+    if(n > 1e11) n = n / 1000;
+    const d = new Date(n * 1000);
+    if(!isNaN(d)){
+      const p = x => String(x).padStart(2,'0');
+      return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+  }
+  return s;
+}
+function fmtTok(v){
+  if(v == null) return '—';
+  const n = Number(v);
+  if(!isFinite(n)) return '—';
+  if(n >= 1e9) return (n/1e9).toFixed(2)+'B';
+  if(n >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if(n >= 1e3) return (n/1e3).toFixed(1)+'K';
+  return String(Math.round(n));
+}
+function fmtNum(v, digits){
+  if(v == null || v === '') return '—';
+  const n = Number(v);
+  if(!isFinite(n)) return esc(String(v));
+  return digits != null ? n.toFixed(digits) : n.toLocaleString('zh-CN');
+}
+function fmtClock(sec){
+  if(!sec) return '—';
+  return new Date(sec * 1000).toLocaleString('zh-CN', {hour12:false}).replace(/\//g,'-');
+}
+function setBadge(badgeId, txtId, state, text){
+  const b = $(badgeId);
+  if(!b) return;
+  b.className = 'badge ' + state;
+  $(txtId).textContent = text;
+}
+function quotaBar(remaining, total){
+  if(remaining == null || total == null || !total) return '<span class="txt">—</span>';
+  const pct = Math.max(0, Math.min(100, Number(remaining) / Number(total) * 100));
+  const cls = pct < 15 ? 'fill low' : 'fill';
+  return `<div class="qbar"><div class="track"><i class="${cls}" style="width:${pct.toFixed(1)}%"></i></div>`
+       + `<span class="txt">${fmtNum(remaining,0)} / ${fmtNum(total,0)}</span></div>`;
+}
+
+/* ---------------- 标签页 ---------------- */
+let activeTab = 'overview';
+function showTab(name){
+  activeTab = name;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.id === 'panel-' + name));
+  if(name === 'logs') loadLogs();
+  if(name === 'trae') loadTrae();
+  if(name === 'wb') loadWb();
+  if(name === 'rates') refreshRates();
+}
+$('tabs').addEventListener('click', e => {
+  const t = e.target.closest('.tab');
+  if(t) showTab(t.dataset.tab);
+});
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-goto]');
+  if(g) showTab(g.dataset.goto);
+});
+
+/* ---------------- 状态带 ---------------- */
+function renderStatbar(d){
+  const t = d.trae || {}, w = d.workbuddy || {}, c = d.controllers || [];
+  const alive = c.filter(x => x.alive).length;
+  const today = d.trae_today || {};
+  const items = [
+    { k:'Trae 账号', v: t.running ? String(t.account_count ?? 0) : '—',
+      cls: t.running ? (t.account_count ? 'ok' : 'warn') : 'dim',
+      sub: t.running && t.polling ? '轮询中' : (t.running ? '轮询关' : '离线') },
+    { k:'Trae 令牌', v: !t.running ? '—' : (t.token_ok ? '有效' : (t.authorized ? '待刷新' : '未授权')),
+      cls: !t.running ? 'dim' : (t.token_ok ? 'ok' : 'warn'), sub: t.source || '' },
+    { k:'WB 模型', v: w.running ? String(w.model_count ?? '—') : '—',
+      cls: w.running ? 'ok' : 'dim', sub: w.running ? (w.model_source||'') : '离线' },
+    { k:'WB 账号', v: w.running ? String((w.accounts||[]).length) : '—',
+      cls: w.running ? 'ok' : 'dim',
+      sub: (w.accounts||[]).filter(a => a.state === 'active').length + ' 活跃' },
+    { k:'控制器', v: alive + ' / ' + c.length, cls: alive === c.length ? 'ok' : (alive ? 'warn' : 'bad'),
+      sub: alive === c.length ? '全部在跑' : '有掉线' },
+    { k:'今日请求', v: today.requests != null ? String(today.requests) : '—', cls: 'dim',
+      sub: today.tokens ? fmtTok(today.tokens) + ' tokens' : '' },
+  ];
+  $('statbar').innerHTML = items.map(i =>
+    `<div class="stat"><div class="k">${esc(i.k)}</div>`
+    + `<div class="v ${i.cls}">${esc(i.v)}${i.sub ? `<small>${esc(i.sub)}</small>` : ''}</div></div>`
+  ).join('');
+}
+
+/* ---------------- 总览 ---------------- */
+function renderOverview(d){
+  const t = d.trae || {}, w = d.workbuddy || {};
+  setBadge('trae-badge','trae-badge-txt', t.running ? 'up' : 'down', t.running ? '运行中' : '未运行');
+  setBadge('wb-badge','wb-badge-txt', w.running ? 'up' : 'down', w.running ? '运行中' : '未运行');
+  $('trae-accounts').textContent = t.running ? (t.account_count ?? 0) : '—';
+  const poll = $('trae-polling');
+  poll.textContent = t.running ? (t.polling ? '开' : '关') : '—';
+  poll.className = 'v ' + (t.running && t.polling ? 'ok' : 'off');
+  const tk = $('trae-token');
+  if(!t.running){ tk.textContent='—'; tk.className='v'; }
+  else if(t.token_ok){ tk.textContent='有效'; tk.className='v ok'; }
+  else if(t.authorized){ tk.textContent='待刷新'; tk.className='v warn'; }
+  else { tk.textContent='未授权'; tk.className='v warn'; }
+
+  $('wb-models').textContent = w.running ? (w.model_count ?? '—') : '—';
+  $('wb-creds').textContent = w.running ? ((w.accounts||[]).length + ' 个') : '—';
+  $('wb-version').textContent = w.running ? (w.version || '—') : '—';
+
+  $('dot-trae').className = 'dot ' + (t.running ? 'ok' : 'bad');
+  $('dot-wb').className = 'dot ' + (w.running ? 'ok' : 'bad');
+
+  renderControllers(d.controllers || []);
+}
+
+const CTRL_ICONS = {
+  watchdog: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M9.5 12.5l1.8 1.8 3.4-3.6"/>',
+  v41flash: '<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10.5H13l1-8.5z"/>',
+};
+function renderControllers(list){
+  if(!list.length){ $('ctrl-grid').innerHTML = '<div class="empty">无控制器信息</div>'; return; }
+  $('ctrl-grid').innerHTML = list.map(c => `
+    <article class="card ctrl">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${CTRL_ICONS[c.id] || CTRL_ICONS.watchdog}</svg></div>
+      <div class="body">
+        <div class="t">${esc(c.name)}</div>
+        <div class="d">${esc(c.desc)}</div>
+      </div>
+      <span class="badge ${c.alive ? 'up' : 'down'}"><span class="led"></span>${c.alive ? '在跑' : '未运行'}</span>
+    </article>`).join('');
+}
+
+/* ---------------- Trae ---------------- */
+async function loadTrae(){
+  try{
+    const r = await fetch('/api/trae', {cache:'no-store'});
+    const d = await r.json();
+    renderTraeDetail(d);
+  }catch(e){
+    $('trae-poll-hint').textContent = 'Trae 数据加载失败：' + e;
+  }
+}
+function renderTraeDetail(d){
+  const accs = d.accounts || [];
+  const poll = d.polling ? `轮询：开（${esc(d.polling_mode || '')}）` : '轮询：关';
+  $('trae-poll-hint').textContent = d.running ? `${accs.length} 个账号 · ${poll}` : '网关未运行';
+  const tb = document.querySelector('#trae-acct-table tbody');
+  if(!d.running){
+    tb.innerHTML = '<tr><td colspan="6" class="empty">网关未运行，启动后可查看账号</td></tr>';
+  }else if(!accs.length){
+    tb.innerHTML = '<tr><td colspan="6" class="empty">还没有账号 —— 点「+ 添加账号」授权一个</td></tr>';
+  }else{
+    tb.innerHTML = accs.map(a => {
+      const cr = a.credits || {};
+      const quota = (cr.remaining != null && cr.total_limit != null)
+        ? quotaBar(cr.remaining, cr.total_limit) : '<span class="txt">—</span>';
+      return `<tr>
+        <td class="strong">${esc(a.label || '—')}<div class="mono mute" style="font-size:11px">${esc(a.id || '')}</div></td>
+        <td><span class="chip off">Trae CN</span></td>
+        <td><span class="chips">
+          ${a.active ? '<span class="chip info">活跃</span>' : ''}
+          <span class="chip ${a.valid ? 'ok' : 'bad'}">${a.valid ? '有效' : '失效'}</span>
+          <span class="chip ${a.checked_in ? 'ok' : 'off'}">${a.checked_in ? '已签到' : '未签到'}</span>
+          <button class="tiny ${a.model_enabled ? '' : 'ghost'}" data-act="toggle-model" data-id="${esc(a.id)}" data-on="${a.model_enabled ? 1 : 0}">
+            ${a.model_enabled ? '模型已开' : '模型关闭'}</button>
+        </span></td>
+        <td>${quota}</td>
+        <td class="mono mute">${fmtExpiry(a.expires)}</td>
+        <td>${a.active ? '<span class="mute">—</span>'
+          : `<button class="tiny" data-act="switch-account" data-id="${esc(a.id)}">设为活跃</button>`}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  /* 今日用量 */
+  const ov = d.overview || {};
+  const usage = ov.usage || {};
+  const today = usage.today || null;
+  const totals = usage.totals || null;
+  const svc = ov.service || {};
+  if(today){
+    $('trae-usage').innerHTML = [
+      { k:'请求', v: String(today.requests ?? 0), sub:`完成 ${today.completed ?? 0} · 失败 ${today.failed ?? 0}`, cls:'' },
+      { k:'Tokens', v: fmtTok(today.total_tokens), sub:`输入 ${fmtTok(today.input_tokens)} · 缓存 ${fmtTok(today.cached_tokens)}`, cls:'' },
+      { k:'积分消耗', v: today.credits != null ? Number(today.credits).toFixed(1) : '—', sub:`工具调用 ${today.tool_calls ?? 0} 次`, cls:'ok' },
+      { k:'累计请求', v: String(totals?.requests ?? 0), sub:`累计 ${fmtTok(totals?.total_tokens)} tokens`, cls:'' },
+      { k:'累计积分', v: totals?.credits != null ? Number(totals.credits).toFixed(1) : '—', sub:`活跃 ${usage.active_days ?? 0} 天`, cls:'ok' },
+      { k:'运行时长', v: svc.uptime_seconds ? Math.floor(svc.uptime_seconds/3600)+'h' : '—',
+        sub: `${esc(svc.upstream_mode || '')} · v${esc(svc.version || '')}`, cls:'dim' },
+    ].map(i => `<div class="stat"><div class="k">${esc(i.k)}</div><div class="v ${i.cls}">${esc(i.v)}`
+      + `${i.sub ? `<small>${esc(i.sub)}</small>` : ''}</div></div>`).join('');
+  }else{
+    $('trae-usage').innerHTML = '<div class="empty">用量数据不可用</div>';
+  }
+
+  /* 模型分布（近 7 日） */
+  const daily = usage.daily || [];
+  const agg = {};
+  daily.forEach(day => (day.models || []).forEach(m => {
+    const k = m.model;
+    agg[k] = agg[k] || { model:k, requests:0, input_tokens:0, output_tokens:0, total_tokens:0 };
+    agg[k].requests += m.requests || 0;
+    agg[k].input_tokens += m.input_tokens || 0;
+    agg[k].output_tokens += m.output_tokens || 0;
+    agg[k].total_tokens += m.total_tokens || 0;
+  }));
+  const rows = Object.values(agg).sort((a,b) => b.requests - a.requests);
+  const mb = document.querySelector('#trae-model-table tbody');
+  mb.innerHTML = rows.length ? rows.map(m => `<tr>
+      <td class="strong">${esc(m.model)}</td>
+      <td class="num mono">${fmtNum(m.requests)}</td>
+      <td class="num mono mute">${fmtTok(m.input_tokens)}</td>
+      <td class="num mono mute">${fmtTok(m.output_tokens)}</td>
+      <td class="num mono">${fmtTok(m.total_tokens)}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="5" class="empty">近 7 日无调用记录</td></tr>';
+
+  /* 签到 */
+  const ci = (d.checkin && d.checkin.accounts) || [];
+  const cb = document.querySelector('#trae-checkin-table tbody');
+  cb.innerHTML = ci.length ? ci.map(a => {
+    const st = a.checkin || {};
+    return `<tr>
+      <td class="strong">${esc(a.label || a.id || '—')}</td>
+      <td><span class="chip ${st.checked_in ? 'ok' : 'off'}">${st.checked_in ? '已签到' : '未签到'}</span></td>
+      <td class="num mono">${st.credits != null ? fmtNum(st.credits) : '—'}</td>
+      <td class="mute">${esc(st.message || (a.success ? 'ok' : '失败'))}</td>
+      <td><button class="tiny" data-act="checkin-all">全部签到</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">无签到数据</td></tr>';
+}
+
+/* ---------------- WorkBuddy ---------------- */
+let wbCache = null;
+async function loadWb(){
+  try{
+    const r = await fetch('/api/wb', {cache:'no-store'});
+    const d = await r.json();
+    wbCache = d;
+    renderWbDetail(d);
+  }catch(e){
+    $('wb-updated').textContent = 'WorkBuddy 数据加载失败：' + e;
+  }
+}
+function renderWbDetail(d){
+  $('wb-updated').textContent = d.updated ? '快照 ' + fmtClock(d.updated) : '';
+  const tb = document.querySelector('#wb-acct-table tbody');
+  const accs = d.accounts || [];
+  tb.innerHTML = accs.length ? accs.map(a => {
+    const site = a.edition === 'intl' ? '国际站' : (a.edition === 'cn' ? '国内站' : (a.edition || '—'));
+    const cooling = Object.values(a.modelStates || {}).filter(s => s && s.cooldownUntil && s.cooldownUntil * 1000 > Date.now());
+    return `<tr>
+      <td class="strong">${esc(a.nickname)}<div class="mono mute" style="font-size:11px">${esc(a.path)}</div></td>
+      <td><span class="chip ${a.edition === 'intl' ? 'info' : 'violet'}">${esc(site)}</span></td>
+      <td><span class="chips">
+        <span class="chip ${a.state === 'active' ? 'ok' : 'bad'}">${esc(a.state)}</span>
+        ${cooling.length ? `<span class="chip warn">冷却 ${cooling.length}</span>` : ''}
+        ${a.paid ? '<span class="chip warn">付费</span>' : '<span class="chip ok">免费</span>'}
+      </span></td>
+      <td>${quotaBar(a.quotaRemaining, a.quotaTotal)}</td>
+      <td class="mono mute">${fmtExpiry(a.expires)}</td>
+      <td><button class="tiny" data-act="wb-add-${a.edition === 'intl' ? 'intl' : 'cn'}" data-file="${esc(a.path)}">重新登录</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">还没有账号 —— 点「+ 国内站」或「+ 国际站」登录一个</td></tr>';
+
+  const mb = document.querySelector('#wb-model-table tbody');
+  const models = d.models || [];
+  mb.innerHTML = models.length ? models.map(m => `<tr>
+      <td class="strong mono">${esc(m.id)}</td>
+      <td class="num mono">${esc(m.cnMultiplier || '—')}</td>
+      <td class="num mono">${esc(m.intlMultiplier || '—')}</td>
+      <td class="num mono">${fmtNum(m.availableAccounts)}</td>
+      <td class="num mono">${fmtNum(m.requests)}</td>
+      <td class="num mono">${fmtNum(m.success)}</td>
+      <td class="num mono ${m.failed ? 'strong' : 'mute'}">${fmtNum(m.failed)}</td>
+      <td class="num mono mute">${fmtTok(m.tokens)}</td>
+      <td class="mute">${esc(m.lastStatus || '—')}</td>
+    </tr>`).join('') : '<tr><td colspan="9" class="empty">无模型数据</td></tr>';
+
+  renderWbConfig(d);
+  renderWbUsage(d);
+}
+function renderWbUsage(d){
+  const t = d.today || {};
+  const m = (d.models || [])[0] || {};
+  const rate = (m.requests && m.success != null) ? Math.round(m.success / m.requests * 100) : null;
+  $('wb-usage-hint').textContent = t.log ? '来源 ' + t.log : '';
+  const items = [
+    { k:'请求', v: t.requests != null ? String(t.requests) : '—',
+      sub:`完成 ${t.completed ?? 0} · 失败 ${t.failed ?? 0}`, cls:'' },
+    { k:'Tokens', v: fmtTok(t.tokens), sub:'今日累计', cls:'' },
+    { k:'平均首字', v: t.avg_ttft_ms ? (t.avg_ttft_ms/1000).toFixed(1)+'s' : '—', sub:'首 token 延迟', cls:'' },
+    { k:'平均耗时', v: t.avg_elapsed_ms ? (t.avg_elapsed_ms/1000).toFixed(1)+'s' : '—', sub:'单请求总时长', cls:'' },
+    { k:'累计请求', v: fmtNum(m.requests), sub:`累计 ${fmtTok(m.tokens)} tokens`, cls:'' },
+    { k:'成功率', v: rate != null ? rate + '%' : '—', sub:'网关启动以来', cls:'ok' },
+  ];
+  $('wb-usage').innerHTML = items.map(i =>
+    `<div class="stat"><div class="k">${esc(i.k)}</div><div class="v ${i.cls}">${esc(i.v)}`
+    + `${i.sub ? `<small>${esc(i.sub)}</small>` : ''}</div></div>`).join('');
+}
+function renderWbConfig(d){
+  const cfg = d.config || {};
+  const allow = cfg.allowlist || [];
+  $('cfg-allow').innerHTML = allow.length ? allow.map(m =>
+    `<span class="tag">${esc(m)}<button data-rm-allow="${esc(m)}" title="移除">×</button></span>`).join('')
+    : '<span class="cfg-note">空 = 不限制（网关暴露全部模型）</span>';
+
+  const sel = $('cfg-allow-add');
+  const known = (d.models || []).map(m => m.id).filter(Boolean);
+  sel.innerHTML = known.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('')
+    || '<option value="">（无可用模型）</option>';
+
+  const binds = cfg.accounts || {};
+  const keys = Object.keys(binds);
+  $('cfg-bind').innerHTML = keys.length ? keys.map(m => {
+    const files = (binds[m] && binds[m].allowlist) || [];
+    return `<span class="tag">${esc(m)} → ${esc(files.join(', ') || '自动')}</span>`;
+  }).join('') : '<span class="cfg-note">未设置站点绑定（模型按可用账号自动选择）</span>';
+
+  const note = [];
+  note.push(`白名单：${allow.length ? '仅暴露 ' + allow.length + ' 个模型' : '未限制'}`);
+  note.push(`账号文件：${(d.cred_files || []).join(' / ')}`);
+  note.push('config.json 不热加载，保存后需重启网关生效；文件必须 UTF-8 无 BOM。');
+  $('cfg-note').innerHTML = note.map(esc).join('<br>');
+}
+
+/* ---------------- 倍率 ---------------- */
+function renderRates(state){
+  state = state || {};
+  const body = $('rates-body');
+  const upd = $('rates-updated');
+  const btn = $('rates-btn');
+  if(state.running){
+    btn.disabled = true; btn.classList.add('busy');
+    upd.innerHTML = '<b>' + esc(state.progress || '实测中…') + '</b>';
+  }else{
+    btn.disabled = false; btn.classList.remove('busy');
+    upd.innerHTML = state.updated
+      ? '上次实测 <b>' + new Date(state.updated * 1000).toLocaleString('zh-CN') + '</b>'
+      : '尚未实测';
+  }
+  const rows = state.results || [];
+  if(!rows.length){
+    if(!state.running){
+      body.innerHTML = '<div class="empty">点「重新实测」开始'
+        + '<span class="hint">对每个 Trae 模型发一次相同请求，约 1–3 分钟，消耗少量积分</span></div>';
+    }
+    return;
+  }
+  const maxRel = Math.max(...rows.map(r => r.relative || 0), 1);
+  body.innerHTML = rows.map(r => {
+    if(r.error){
+      return `<div class="rate-row">
+        <span class="rate-model">${esc(r.model)}</span>
+        <span class="rate-credits">—</span>
+        <span class="bar"><i style="width:0"></i></span>
+        <span class="rate-badge peak">失败</span>
+        <span class="rate-val">${esc(r.error)}</span>
+      </div>`;
+    }
+    const rel = r.relative || 0;
+    const pct = Math.max(4, Math.round(rel / maxRel * 100));
+    const credits = (r.credits === null || r.credits === undefined) ? '—' : Number(r.credits).toFixed(2);
+    const tok = `${r.prompt_tokens || 0}+${r.completion_tokens || 0}`;
+    const peak = rel >= maxRel - 1e-9 ? ' peak' : '';
+    return `<div class="rate-row">
+      <span class="rate-model">${esc(r.model)}</span>
+      <span class="rate-credits mono">${credits} 分</span>
+      <span class="bar"><i style="width:${pct}%"></i></span>
+      <span class="rate-badge${peak}">${rel.toFixed(1)}x</span>
+      <span class="rate-val mono">${tok} tok</span>
+    </div>`;
+  }).join('');
+}
+async function refreshRates(){
+  try{
+    const r = await fetch('/api/model-rates', {cache:'no-store'});
+    renderRates(await r.json());
+  }catch(e){ /* ignore */ }
+}
+
+/* ---------------- 日志 ---------------- */
+let logSrc = 'wb';
+let logTimer = null;
+$('log-seg').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(!b) return;
+  logSrc = b.dataset.src;
+  document.querySelectorAll('#log-seg button').forEach(x => x.classList.toggle('on', x === b));
+  loadLogs();
+});
+function logClass(line){
+  if(/失败|错误|ERROR|panic|error/.test(line)) return 'bad';
+  if(/WARN|警告|冷却|429|6004|14018|\[ModelCooldown\]/.test(line)) return 'warn';
+  if(/状态码=200|结果=成功|结果=OK|成功/.test(line)) return 'ok';
+  if(/\[请求到达\]|\[响应返回\]|\[业务入口\]/.test(line)) return 'dim';
+  return '';
+}
+async function loadLogs(){
+  try{
+    const r = await fetch('/api/logs?src=' + encodeURIComponent(logSrc) + '&n=400', {cache:'no-store'});
+    const d = await r.json();
+    $('log-path').textContent = d.path ? (d.path.split('\\').pop() + ' · ' + fmtTok(d.size) + 'B') : '（无文件）';
+    const box = $('logbox');
+    if(d.missing || !d.lines || !d.lines.length){
+      box.innerHTML = '<span class="ln dim">（暂无日志）</span>';
+      return;
+    }
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+    box.innerHTML = d.lines.map(l =>
+      `<div class="ln ${logClass(l)}">${esc(l)}</div>`).join('');
+    if(atBottom) box.scrollTop = box.scrollHeight;
+  }catch(e){ /* ignore */ }
+}
+
+/* ---------------- 动作 ---------------- */
+const LABELS = {
+  'open-trae-console':'已打开 Trae 控制台',
+  'add-account':'已打开添加账号窗口（独立浏览器会话）',
+  'start-trae':'已发出 Trae 启动指令（约 6 秒后就绪）',
+  'start-wb':'已发出 WorkBuddy 启动指令',
+  'start-all':'已发出全部启动指令',
+  'restart-wb':'WorkBuddy 网关已重启',
+  'open-hub':'已打开 Hub 看板',
+  'open-trae-logs':'已打开 Trae 日志目录',
+  'open-wb-logs':'已打开 WorkBuddy 日志目录',
+  'open-docs':'已打开 Trae 项目目录',
+  'open-wb-docs':'已打开 WorkBuddy 项目目录',
+  'measure-rates':'已开始实测，页面会实时显示进度',
+  'switch-account':'已切换活跃账号',
+  'toggle-model':'已切换模型请求开关',
+  'checkin-all':'签到指令已执行',
+  'wb-config':'配置已写入，重启网关后生效',
+  'wb-add-cn':'已打开国内站登录窗口（微信扫码）',
+  'wb-add-intl':'已打开国际站登录窗口（浏览器内完成）'
+};
+async function act(name, btn, body){
+  if(btn) btn.classList.add('busy');
+  try{
+    const r = await fetch('/api/action/' + name, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body || {})
+    });
+    const d = await r.json();
+    if(d.ok){
+      toast(LABELS[name] || '已执行');
+      if(name === 'measure-rates'){ setTimeout(refreshRates, 600); }
+      else if(name === 'switch-account' || name === 'toggle-model'){ setTimeout(loadTrae, 500); setTimeout(refresh, 300); }
+      else if(name === 'wb-config'){ setTimeout(loadWb, 400); }
+      else { setTimeout(refresh, 1500); }
+    }else{
+      toast('操作失败：' + (d.error || '未知错误'), true);
+    }
+  }catch(e){
+    toast('请求失败：' + e, true);
+  }finally{
+    if(btn) setTimeout(() => btn.classList.remove('busy'), 700);
+  }
+}
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-act]');
+  if(btn && !btn.disabled){
+    const body = {};
+    if(btn.dataset.id) body.account_id = btn.dataset.id;
+    if(btn.dataset.file) body.file = btn.dataset.file;
+    if(btn.dataset.act === 'toggle-model') body.enabled = btn.dataset.on !== '1';
+    act(btn.dataset.act, btn, body);
+  }
+  const rm = e.target.closest('[data-rm-allow]');
+  if(rm && wbCache){
+    const cfg = wbCache.config || {};
+    const next = (cfg.allowlist || []).filter(m => m !== rm.dataset.rmAllow);
+    act('wb-config', null, { allowlist: next });
+  }
+});
+$('cfg-allow-btn').addEventListener('click', () => {
+  if(!wbCache) return;
+  const cfg = wbCache.config || {};
+  const v = $('cfg-allow-add').value;
+  if(!v) return;
+  const next = Array.from(new Set([...(cfg.allowlist || []), v]));
+  act('wb-config', $('cfg-allow-btn'), { allowlist: next });
+});
+$('cfg-save').addEventListener('click', () => {
+  if(!wbCache) return;
+  const cfg = wbCache.config || {};
+  act('wb-config', $('cfg-save'), { allowlist: cfg.allowlist || [], accounts: cfg.accounts || {} });
+});
+$('cfg-reload').addEventListener('click', () => loadWb());
+
+/* ---------------- 主循环 ---------------- */
+async function refresh(){
+  try{
+    const r = await fetch('/api/status', {cache:'no-store'});
+    const d = await r.json();
+    renderStatbar(d);
+    renderOverview(d);
+    $('clock').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN');
+    $('live').classList.remove('dead');
+    if(activeTab === 'trae') loadTrae();
+    if(activeTab === 'wb') loadWb();
+    if(activeTab === 'rates') refreshRates();
+  }catch(e){
+    $('clock').textContent = '面板服务未响应';
+    $('live').classList.add('dead');
+  }
+}
+document.addEventListener('keydown', e => {
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r'){
+    e.preventDefault(); refresh(); toast('已刷新'); return;
+  }
+  if((e.ctrlKey || e.metaKey) && /^[1-5]$/.test(e.key)){
+    e.preventDefault();
+    const order = ['overview','trae','wb','rates','logs'];
+    showTab(order[Number(e.key) - 1]);
+  }
+});
+
+refresh();
+setInterval(refresh, 5000);
+setInterval(() => { if(activeTab === 'logs' && $('log-follow').checked) loadLogs(); }, 4000);
+</script>
+</body>
+</html>

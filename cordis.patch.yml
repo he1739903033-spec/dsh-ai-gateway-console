@@ -1,0 +1,27 @@
+# dsh-ai-gateway-console bundle patch
+#
+# 只注册一个 host 侧插件：它把本地三个反代服务（Trae 网关 / WorkBuddy 网关 /
+# WorkBuddy Hub）与后台控制器的状态聚合成一条 HTTP 接缝，并挂出状态页：
+#
+#   GET  /ai-gateway                 状态页（浏览器直接开）
+#   GET  /ai-gateway/status          聚合快照
+#   GET  /ai-gateway/config          当前配置 + 体检
+#   GET  /ai-gateway/logs?src=&n=    日志 tail
+#   POST /ai-gateway/action          启动控制台 / 启动网关
+#
+# 路径不在这里配 —— 插件按「配置文件 → 常见位置扫描 → 特征文件识别」三级解析，
+# 每个人的安装目录不同也能跑。要显式钉死路径，写 ~/.dsh/ai-gateway-console.json
+# 或设环境变量 AIGW_TRAE_BASE / AIGW_WB_BASE / AIGW_HUB_BASE。
+#
+# 改下面 config 后需重启 dsh 生效（cordis loader 不会用新 config 重新应用已加载的插件）。
+
+- insert:
+    - id: ai-gateway-console
+      name: 'dsh-ai-gateway-console'
+      config:
+        # 控制台端口（控制台是可选组件；只用状态页的话不必装 Python）
+        consolePort: 8330
+        # dsh 启动时是否自动拉起控制台进程
+        autoStart: false
+        # 快照缓存时长（毫秒）—— 面板刷新很勤，别每次都打上游
+        statusTtlMs: 5000

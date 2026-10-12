@@ -1,0 +1,50 @@
+{
+  "name": "dsh-ai-gateway-console",
+  "version": "1.0.0",
+  "description": "把本地 AI 反代网关（Trae / WorkBuddy / Hub）的部署状态与控制能力挂进 DeepSeek Harness：一条命令看全三个服务的运行态、账号池、模型白名单与后台控制器，路径自动探测，无需改任何代码。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./config": "./lib/config.js",
+    "./detect": "./lib/detect.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "console",
+    "scripts",
+    "docs",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "doctor": "node scripts/doctor.mjs",
+    "probe": "node scripts/probe.mjs",
+    "selftest": "node --test test/plugin.test.mjs"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "ai-gateway",
+    "reverse-proxy",
+    "trae",
+    "workbuddy",
+    "console"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

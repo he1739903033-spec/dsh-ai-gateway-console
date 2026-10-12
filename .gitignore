@@ -1,0 +1,18 @@
+# 依赖
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+
+# 运行期产物
+*.log
+rates.json
+webview-profile/
+config.json
+__pycache__/
+*.pyc
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
