@@ -58,10 +58,20 @@ powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 ### 装完先自检
 
 ```powershell
-node scripts\doctor.mjs
+node scripts\verify-install.mjs   # 装对了吗（不需要重启 DSH）
+node scripts\doctor.mjs           # 环境与网关通不通
 ```
 
-它会把「路径探测到了什么、哪个服务没起来、缺什么」一次说清，包括：
+`verify-install` 会按包名从 profile 解析入口、真正 import、再带着 mock ctx 干跑一遍 `apply()`：
+
+```
+[OK] dependencies.dsh-ai-gateway-console = link:C:/.../dsh-ai-gateway-console
+[OK] dsh.profile.bundles 已登记
+[OK] 按包名解析到入口：C:\...\dsh-ai-gateway-console\lib\index.js
+[OK] apply() 干跑通过，注册了 6 条路由
+```
+
+`doctor` 会把「路径探测到了什么、哪个服务没起来、缺什么」一次说清：
 
 ```
 组件路径
@@ -213,7 +223,8 @@ dsh-ai-gateway-console/
 │   ├── install.ps1       安装
 │   ├── uninstall.ps1     卸载
 │   ├── probe.mjs         探测并写配置
-│   └── doctor.mjs        环境自检
+│   ├── doctor.mjs        环境自检
+│   └── verify-install.mjs 安装正确性校验（不需要重启 DSH）
 └── docs/
     ├── 安装.md
     ├── 网关部署.md        反代服务本身的部署方法
