@@ -9,8 +9,13 @@
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { apply, inject, name } from '../lib/index.js'
+
+const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 /* ---------------------------------------------------------------- mock */
 
@@ -228,4 +233,28 @@ test('/ai-gateway/console 带 start=1 时也不对未知来源放行', async () 
     host: '10.0.0.5:8080',
   })
   assert.equal(res.statusCode, 403)
+})
+
+test('PowerShell 脚本都带 UTF-8 BOM', () => {
+  // 这条是踩出来的：Windows PowerShell 5.1 对无 BOM 的文件按系统 ANSI 解码，
+  // 脚本里的中文会变成乱码，进而把引号和花括号一起搅坏 —— 表现为莫名其妙的
+  // "缺少 )" / "Unexpected token" 语法错误，而文件内容其实完好。
+  // 编辑器/工具在保存时很容易把 BOM 吃掉，所以用测试卡住。
+  const dir = path.join(PLUGIN_ROOT, 'scripts')
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.ps1'))
+  assert.ok(files.length > 0, 'scripts 目录下应该至少有一个 .ps1')
+  for (const file of files) {
+    const buf = fs.readFileSync(path.join(dir, file))
+    const hasBom = buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf
+    assert.ok(hasBom, `${file} 缺少 UTF-8 BOM —— PS 5.1 会把中文当 ANSI 解码，语法会崩`)
+  }
+})
+
+test('脚本里的中文确实是 UTF-8（BOM 之外的内容也要能解码）', () => {
+  const dir = path.join(PLUGIN_ROOT, 'scripts')
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.ps1'))) {
+    const buf = fs.readFileSync(path.join(dir, file))
+    const text = buf.toString('utf8')
+    assert.ok(!text.includes('\uFFFD'), `${file} 含替换字符，说明不是合法 UTF-8`)
+  }
 })

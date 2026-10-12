@@ -192,10 +192,21 @@ Ok "origin = $cleanUrl"
 
 Say '推送…'
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+
+# git 把进度写到 stderr，而本脚本开头设了 $ErrorActionPreference='Stop' ——
+# 那条 stderr 会被当成终止性错误当场抛出，于是「推送明明成功、脚本却停在
+# 这一行」并留下一个假的失败退出码。临时放开偏好，只认 git 的退出码。
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 # PS 对原生命令会把数组变量展开成多个参数；不要用 @var（那是 PS 命令的 splatting）
-git $gitProxyArgs -c "credential.helper=" push $pushUrl $branch 2>&1 | Select-Object -Last 6
-if ($LASTEXITCODE -ne 0) {
-    Fail '推送失败'
+$pushOut = git $gitProxyArgs -c "credential.helper=" push $pushUrl $branch 2>&1
+$pushCode = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+
+foreach ($line in ($pushOut | Select-Object -Last 8)) { Write-Host "    $line" }
+
+if ($pushCode -ne 0) {
+    Fail "推送失败（git 退出码 $pushCode）"
     Say '  常见原因：'
     Say '    · token 没有 repo 权限'
     Say '    · 网络不通 —— 用 -Proxy http://127.0.0.1:7892 重试'
@@ -204,9 +215,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 Ok '推送完成'
 
-# 推完把临时 URL 从 reflog 里也擦掉，避免 token 残留在本地历史
+# 上游追踪要指向干净地址 —— 用带 token 的 URL 做 -u 会把 token 写进 .git/config
 git remote set-url origin $cleanUrl
-Ok 'remote 已还原为干净地址（token 未落盘）'
+git config "branch.$branch.remote" origin
+git config "branch.$branch.merge" "refs/heads/$branch"
+Ok "origin = $cleanUrl（token 未落盘，已设上游追踪）"
 
 Write-Host ''
 Write-Host "完成：$cleanUrl" -ForegroundColor Green
