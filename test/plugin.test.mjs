@@ -136,7 +136,7 @@ test('只接受回环来源：非本机 Host 被 403', async () => {
   const ctx = mockCtx()
   apply(ctx, {})
   for (const path of ['/ai-gateway', '/ai-gateway/status', '/ai-gateway/config']) {
-    const res = await callRoute(ctx, path, { host: '192.168.1.50:8080' })
+    const res = await callRoute(ctx, path, { host: '10.0.0.5:8080' })
     assert.equal(res.statusCode, 403, `${path} 应该拒绝外网 Host`)
     assert.match(res.body, /forbidden/)
   }

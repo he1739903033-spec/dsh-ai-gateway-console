@@ -211,22 +211,24 @@ WB_LOGS = WB_BASE / "logs"
 WB_STATUS = WB_BASE / "workbuddy-status.json"
 WB_CONFIG = WB_BASE / "config.json"
 
-DSH_CONFIG = Path(os.path.expanduser("~/.dsh")) / "profiles" / "desktop" / "cordis.patch.yml"
+DSH_HOME = Path(os.path.expanduser("~/.dsh"))
+DSH_PROFILE = _console_cfg.get("profile") or os.environ.get("AIGW_PROFILE") or "desktop"
+DSH_CONFIG = DSH_HOME / "profiles" / DSH_PROFILE / "cordis.patch.yml"
 
-# 读不到 DSH 配置时的兜底清单（Trae 侧倍率实测对象）
-DEFAULT_RATE_MODELS = [
-    "glm-5.3（trae）",
-    "glm-5.3-flashx（trae）",
-    "kimi-k3（trae）",
-    "doubao-seed-2.1-pro",
-    "qwen3.8-max",
-]
+# 倍率实测的对象清单：优先取配置里的 rateModels；留空时再从 DSH 的 provider 配置里刮。
+# 两者都拿不到就不实测 —— 猜一组模型名发请求只会浪费额度。
+RATE_MODELS = CFG.get("rateModels") or []
 
 
 def wb_cred_files() -> list:
-    """现扫账号文件 —— 运行中新增的账号要能立刻出现在界面上。"""
+    """现扫账号文件 —— 运行中新增的账号要能立刻出现在界面上。
+
+    要排掉网关自己的状态快照：workbuddy-status.json 同样匹配 workbuddy*.json，
+    但它不是凭据，混进列表会让"账号数"虚高。
+    """
     try:
-        return sorted(p.name for p in WB_BASE.glob("workbuddy*.json"))
+        skip = {WB_STATUS.name, WB_CONFIG.name}
+        return sorted(p.name for p in WB_BASE.glob("workbuddy*.json") if p.name not in skip)
     except Exception:
         return []
 
@@ -749,7 +751,14 @@ def _save_rates() -> None:
 
 
 def _trae_models_for_measure() -> list[str]:
-    """从 DSH 配置的 trae-local provider 读取要实测的模型清单。"""
+    """要实测的模型清单。
+
+    优先取配置里的 rateModels；留空时从 DSH 的 provider 配置里刮 ——
+    那份配置里的模型清单天然就是"当前真正在用的那几个"。
+    两者都拿不到就返回空，由调用方给出明确提示，而不是猜一组名字乱发请求。
+    """
+    if RATE_MODELS:
+        return list(RATE_MODELS)
     try:
         text = DSH_CONFIG.read_text(encoding="utf-8")
         match = re.search(r"trae-local:.*?\n\s*models:\s*\n(.*?)(?=\n-\s*id:|\Z)", text, re.S)
@@ -759,7 +768,7 @@ def _trae_models_for_measure() -> list[str]:
                 return [i.strip() for i in ids]
     except Exception:
         pass
-    return list(DEFAULT_RATE_MODELS)
+    return []
 
 
 def _trae_records() -> list[dict]:
@@ -836,6 +845,15 @@ def _measure_worker(models: list[str]) -> None:
 
 
 def start_measure() -> bool:
+    models = _trae_models_for_measure()
+    if not models:
+        with _rate_lock:
+            _rate_state["error"] = (
+                "没有可实测的模型：请在配置文件里加 rateModels 数组，"
+                f"或确认 DSH provider 配置可达（当前找的是 {DSH_CONFIG}）"
+            )
+            _rate_state["progress"] = "无法开始"
+        return False
     with _rate_lock:
         if _rate_state["running"]:
             return False
@@ -844,7 +862,7 @@ def start_measure() -> bool:
         _rate_state["error"] = None
     threading.Thread(
         target=_measure_worker,
-        args=(_trae_models_for_measure(),),
+        args=(models,),
         daemon=True,
     ).start()
     return True
