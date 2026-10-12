@@ -204,3 +204,28 @@ test('reload-config 动作只清缓存，不需要外部依赖', async () => {
   const data = JSON.parse(res.body)
   assert.equal(data.ok, true)
 })
+
+test('/ai-gateway/console 不会因为 GET 就拉起进程', async () => {
+  // 控制台跑没跑取决于本机环境：跑着 => 302 跳转，没跑 => 409 + 提示。
+  // 关键断言是「不许有第三种结果」—— 尤其不许 500，也不许静默启动。
+  const ctx = mockCtx()
+  apply(ctx, {})
+  const res = await callRoute(ctx, '/ai-gateway/console')
+  assert.ok([302, 409].includes(res.statusCode), `意外状态码：${res.statusCode}`)
+  if (res.statusCode === 409) {
+    const data = JSON.parse(res.body)
+    assert.equal(data.ok, false)
+    assert.equal(data.running, false)
+    assert.match(data.hint, /start=1/, '提示里要给出显式拉起的办法')
+  }
+})
+
+test('/ai-gateway/console 带 start=1 时也不对未知来源放行', async () => {
+  const ctx = mockCtx()
+  apply(ctx, {})
+  const res = await callRoute(ctx, '/ai-gateway/console', {
+    url: '/ai-gateway/console?start=1',
+    host: '10.0.0.5:8080',
+  })
+  assert.equal(res.statusCode, 403)
+})

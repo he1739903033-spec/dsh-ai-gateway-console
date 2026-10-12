@@ -1,0 +1,33 @@
+# 跨平台换行与二进制判定。
+#
+# 为什么需要这个文件：仓库里同时有 Node（LF 习惯）、Python（LF 习惯）、
+# PowerShell（传统上是 CRLF）和 Markdown。没有显式声明时，Windows 上
+# clone 出来的文件会被 autocrlf 改写，diff 里全是 "LF will be replaced by CRLF" 噪音，
+# 而 .ps1 的换行一旦在协作者之间不一致，PowerShell 5.1 的解析行为就可能不同。
+#
+# 注意：BOM 不受这里影响 —— BOM 是文件内容的一部分，不是换行约定。
+
+* text=auto
+
+# 源码：统一 LF，避免跨平台 diff 噪音
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.json  text eol=lf
+*.py    text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# PowerShell：Windows 生态约定 CRLF。
+# 脚本本身带 UTF-8 BOM（PS 5.1 需要它来正确解码中文），BOM 与换行互不影响。
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+*.vbs   text eol=crlf
+
+# 二进制：不做任何换行转换
+*.png   binary
+*.ico   binary
+*.zip   binary
+*.exe   binary

@@ -95,7 +95,7 @@ node scripts\doctor.mjs           # 环境与网关通不通
 | `/ai-gateway/status?deep=1` | 完整快照（含控制器互斥体探测，约 0.5 秒） |
 | `/ai-gateway/config` | GET 看当前配置与体检，POST 写回 |
 | `/ai-gateway/logs?src=wb&n=200` | 日志 tail（`src` 取 `trae` / `wb` / 控制器 id） |
-| `/ai-gateway/console` | 拉起控制台并跳转过去 |
+| `/ai-gateway/console` | 跳转到控制台；**未运行时返回 409**，要拉起得带 `?start=1` |
 
 ### 独立控制台（可选）
 
@@ -194,6 +194,16 @@ WorkBuddy 的 key 从 `WorkBuddyConsole.ps1` 里读 `GATEWAY_KEY` —— 每台�
 
 **多个 profile 都要装**
 对每个 profile 跑一次 `install.ps1 -Profile <名字>`。插件目录只有一份，多个 profile 共享。
+
+**仓库里的 `config.json` 为什么没被跟踪**
+`.gitignore` 默认排除它 —— 那个位置是"随仓库携带配置"用的（解析顺序里排在环境变量之前），
+但它很可能含网关密钥，误提交一次就洗不掉了。真要随仓库带配置：
+
+```powershell
+git add -f config.json
+```
+
+平时建议把配置放在 `~/.dsh/ai-gateway-console.json`（安装脚本写的位置），跟仓库彻底分开。
 
 ## 卸载
 
